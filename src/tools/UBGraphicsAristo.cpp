@@ -11,6 +11,9 @@
 #include <cmath>
 #include <limits>
 
+#include <QGraphicsSceneMouseEvent>
+#include <QGraphicsSceneHoverEvent>
+
 #include "board/UBBoardController.h"
 #include "board/UBDrawingController.h"
 #include "core/UBApplication.h"
@@ -28,10 +31,30 @@ UBGraphicsAristo::UBGraphicsAristo()
     : UBGraphicsTriangle()
     , mDrawingGuide()
     , mStrokeWidth(1.0)
+    , mLocked(false)
+    , mMode(InteractionMode::Free)
+    , mPressedControl(-1)
+    , mSymmetricLengthCm(3.0)
+    , mDrawingGuideVisible(false)
+    , mMeasuredAngle(90.0)
+    , mMeasuredAngleVisible(false)
 {
     // Recalculate after construction: virtual dispatch is intentionally not
     // active while UBGraphicsTriangle's constructor is running.
     setRect(QRectF(0, 0, 800, 400), BottomLeft);
+}
+
+void UBGraphicsAristo::setAristoState(bool locked, int mode,
+                                      qreal symmetricLengthCm)
+{
+    mLocked = locked;
+    if (mode >= static_cast<int>(InteractionMode::Free)
+        && mode <= static_cast<int>(InteractionMode::Perpendicular))
+        mMode = static_cast<InteractionMode>(mode);
+    else
+        mMode = InteractionMode::Free;
+    mSymmetricLengthCm = qBound(0.5, symmetricLengthCm, 20.0);
+    update();
 }
 
 namespace
@@ -82,6 +105,8 @@ void UBGraphicsAristo::StartLine(const QPointF& scenePos, qreal width)
     }
 
     mStrokeWidth = UBDrawingController::drawingController()->currentToolWidth();
+    mDrawingGuideVisible = true;
+    update();
     const QPointF constrained = constrainedPoint(scenePos);
     scene()->moveTo(constrained);
     scene()->drawLineTo(constrained, mStrokeWidth, true);
@@ -96,6 +121,8 @@ void UBGraphicsAristo::DrawLine(const QPointF& scenePos, qreal width)
 
 void UBGraphicsAristo::EndLine()
 {
+    mDrawingGuideVisible = false;
+    update();
 }
 
 QPointF UBGraphicsAristo::constrainedPoint(const QPointF& scenePos) const
@@ -183,6 +210,9 @@ void UBGraphicsAristo::copyItemParameters(UBItem* copy) const
     aristo->setPos(pos());
     aristo->setRect(bounding_Rect(), getOrientation());
     aristo->setTransform(transform());
+    aristo->mLocked = mLocked;
+    aristo->mMode = mMode;
+    aristo->mSymmetricLengthCm = mSymmetricLengthCm;
 }
 
 QPointF UBGraphicsAristo::rotationCenter() const
@@ -205,8 +235,211 @@ void UBGraphicsAristo::paintGraduations(QPainter* painter)
     paintCentredRuler(painter, bounds, baseAtBottom);
     paintPerpendicularScale(painter, bounds, baseAtBottom);
     paintProtractor(painter, bounds, baseAtBottom);
+    paintDynamicMeasurements(painter, bounds, baseAtBottom);
+    paintControls(painter, bounds, baseAtBottom);
 
     painter->restore();
+}
+
+QVector<QRectF> UBGraphicsAristo::controlRects(const QRectF& bounds,
+                                               bool baseAtBottom) const
+{
+    QVector<QRectF> result;
+    const qreal width = 38.0;
+    const qreal height = 28.0;
+    const qreal gap = 5.0;
+    const qreal total = width * 5.0 + gap * 4.0;
+    const qreal y = baseAtBottom ? bounds.bottom() - 35.0 : bounds.top() + 7.0;
+    qreal x = qMin(bounds.right() - total - 8.0, bounds.center().x() + 55.0);
+    x = qMax(bounds.left() + 8.0, x);
+    for (int i = 0; i < 5; ++i, x += width + gap)
+        result << QRectF(x, y, width, height);
+    return result;
+}
+
+void UBGraphicsAristo::paintControls(QPainter* painter, const QRectF& bounds,
+                                     bool baseAtBottom)
+{
+    const QVector<QRectF> controls = controlRects(bounds, baseAtBottom);
+    const QStringList labels = {
+        mLocked ? QString::fromUtf8("🔒") : QString::fromUtf8("🔓"),
+        QString::fromUtf8("∥"), QString::fromUtf8("⟂"),
+        QStringLiteral("-") , QStringLiteral("+")
+    };
+
+    painter->save();
+    QFont buttonFont = painter->font();
+    buttonFont.setBold(true);
+    buttonFont.setPointSizeF(qMax(7.0, buttonFont.pointSizeF() * 0.72));
+    painter->setFont(buttonFont);
+    for (int i = 0; i < controls.size(); ++i)
+    {
+        const bool active = (i == 0 && mLocked)
+            || (i == 1 && mMode == InteractionMode::Parallel)
+            || (i == 2 && mMode == InteractionMode::Perpendicular);
+        painter->setPen(QPen(drawColor(), active ? 2.0 : 1.0));
+        painter->setBrush(active ? QColor(255, 215, 70, 210)
+                                 : QColor(255, 255, 255, 205));
+        painter->drawRoundedRect(controls[i], 5.0, 5.0);
+        painter->drawText(controls[i], Qt::AlignCenter, labels[i]);
+    }
+    painter->restore();
+}
+
+qreal UBGraphicsAristo::displayedRotation() const
+{
+    const QPointF left = mapToScene(QPointF(0.0, 0.0));
+    const QPointF right = mapToScene(QPointF(1.0, 0.0));
+    qreal value = std::fmod(360.0 - QLineF(left, right).angle(), 180.0);
+    if (value < 0.0)
+        value += 180.0;
+    if (qAbs(value - 180.0) < 0.05)
+        value = 0.0;
+    return value;
+}
+
+void UBGraphicsAristo::paintDynamicMeasurements(QPainter* painter,
+                                                 const QRectF& bounds,
+                                                 bool baseAtBottom)
+{
+    const qreal pixelsPerCentimeter =
+        UBApplication::boardController->activeScene()->backgroundGridSize();
+    const qreal halfDistance = mSymmetricLengthCm * pixelsPerCentimeter;
+    const qreal baseY = baseAtBottom ? bounds.bottom() : bounds.top();
+    const qreal direction = baseAtBottom ? -1.0 : 1.0;
+    const qreal centerX = bounds.center().x();
+
+    painter->save();
+    QPen markerPen(QColor(20, 90, 190));
+    markerPen.setWidthF(2.6);
+    painter->setPen(markerPen);
+    for (int side : {-1, 1})
+    {
+        const qreal x = centerX + side * halfDistance;
+        if (x > bounds.left() + 10.0 && x < bounds.right() - 10.0)
+        {
+            painter->drawLine(QPointF(x, baseY),
+                              QPointF(x, baseY + direction * 22.0));
+            QPolygonF marker;
+            marker << QPointF(x, baseY + direction * 24.0)
+                   << QPointF(x - 5.0, baseY + direction * 17.0)
+                   << QPointF(x + 5.0, baseY + direction * 17.0);
+            painter->setBrush(QColor(20, 90, 190));
+            painter->drawPolygon(marker);
+        }
+    }
+
+    QFont infoFont = painter->font();
+    infoFont.setBold(true);
+    infoFont.setPointSizeF(qMax(7.0, infoFont.pointSizeF() * 0.78));
+    painter->setFont(infoFont);
+    const qreal angleValue = mMeasuredAngleVisible ? mMeasuredAngle
+                                                   : displayedRotation();
+    const QString anglePrefix = mMeasuredAngleVisible
+        ? QString::fromUtf8("θ=") : QString::fromUtf8("orientation=");
+    const QString info = QString::fromUtf8("±%1 cm   %2%3° / %4°")
+        .arg(mSymmetricLengthCm, 0, 'f', 1)
+        .arg(anglePrefix)
+        .arg(angleValue, 0, 'f', 1)
+        .arg(180.0 - angleValue, 0, 'f', 1);
+    const qreal infoY = baseAtBottom ? bounds.bottom() - 67.0 : bounds.top() + 43.0;
+    painter->setPen(QColor(20, 70, 150));
+    painter->drawText(QRectF(centerX - 150.0, infoY, 300.0, 22.0),
+                      Qt::AlignCenter, info);
+
+    if (mDrawingGuideVisible && !mDrawingGuide.isNull())
+    {
+        QPen highlight(QColor(0, 125, 255, 210));
+        highlight.setWidthF(4.0);
+        painter->setPen(highlight);
+        painter->drawLine(mDrawingGuide);
+    }
+    painter->restore();
+}
+
+void UBGraphicsAristo::mousePressEvent(QGraphicsSceneMouseEvent* event)
+{
+    const QRectF bounds = bounding_Rect();
+    const bool baseAtBottom = getOrientation() == BottomLeft
+        || getOrientation() == BottomRight;
+    const QVector<QRectF> controls = controlRects(bounds, baseAtBottom);
+    for (int i = 0; i < controls.size(); ++i)
+    {
+        if (controls[i].contains(event->pos()))
+        {
+            mPressedControl = i;
+            event->accept();
+            return;
+        }
+    }
+    UBGraphicsTriangle::mousePressEvent(event);
+}
+
+void UBGraphicsAristo::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
+{
+    if (mPressedControl >= 0)
+    {
+        const int control = mPressedControl;
+        mPressedControl = -1;
+        if (control == 0)
+            mLocked = !mLocked;
+        else if (control == 1)
+            mMode = mMode == InteractionMode::Parallel
+                ? InteractionMode::Free : InteractionMode::Parallel;
+        else if (control == 2)
+        {
+            const bool enteringPerpendicular =
+                mMode != InteractionMode::Perpendicular;
+            if (!mLocked && enteringPerpendicular)
+                rotateAroundCenter(90.0);
+            mMode = !enteringPerpendicular
+                ? InteractionMode::Free : InteractionMode::Perpendicular;
+        }
+        else if (control == 3)
+            mSymmetricLengthCm = qMax(0.5, mSymmetricLengthCm - 0.5);
+        else if (control == 4)
+            mSymmetricLengthCm = qMin(20.0, mSymmetricLengthCm + 0.5);
+        update();
+        if (scene())
+            scene()->setModified(true);
+        event->accept();
+        return;
+    }
+    UBGraphicsTriangle::mouseReleaseEvent(event);
+}
+
+void UBGraphicsAristo::hoverMoveEvent(QGraphicsSceneHoverEvent* event)
+{
+    const QRectF bounds = bounding_Rect();
+    const bool baseAtBottom = getOrientation() == BottomLeft
+        || getOrientation() == BottomRight;
+    const QPointF origin = rotationCenter();
+    const QPointF delta = event->pos() - origin;
+    const qreal radius = qMin(bounds.width() * kProtractorRadiusRatio,
+                              bounds.height() * 0.72);
+    const qreal distance = QLineF(origin, event->pos()).length();
+    const qreal inwardY = baseAtBottom ? -delta.y() : delta.y();
+
+    if (inwardY >= 0.0 && distance >= radius * 0.48
+        && distance <= radius + 18.0)
+    {
+        qreal degrees = std::atan2(inwardY, -delta.x()) * 180.0 / kPi;
+        degrees = qBound(0.0, degrees, 180.0);
+        mMeasuredAngle = qRound(degrees * 10.0) / 10.0;
+        mMeasuredAngleVisible = true;
+    }
+    else
+    {
+        mMeasuredAngleVisible = false;
+    }
+    UBGraphicsTriangle::hoverMoveEvent(event);
+    update();
+}
+
+void UBGraphicsAristo::hoverLeaveEvent(QGraphicsSceneHoverEvent* event)
+{
+    mMeasuredAngleVisible = false;
+    UBGraphicsTriangle::hoverLeaveEvent(event);
 }
 
 void UBGraphicsAristo::paintParallelAndPerpendicularGuides(QPainter* painter,

@@ -37,10 +37,25 @@ public:
     void DrawLine(const QPointF& scenePos, qreal width) override;
     void EndLine() override;
 
+    enum class InteractionMode { Free, Parallel, Perpendicular };
+    bool isInteractionLocked() const { return mLocked; }
+    int interactionModeValue() const { return static_cast<int>(mMode); }
+    qreal symmetricLengthCm() const { return mSymmetricLengthCm; }
+    void setAristoState(bool locked, int mode, qreal symmetricLengthCm);
+
 protected:
     void paintGraduations(QPainter* painter) override;
     QPointF rotationCenter() const override;
     bool usesSymmetricGeometry() const override { return true; }
+    bool allowsMoveInteraction() const override { return !mLocked; }
+    bool allowsRotateInteraction() const override
+        { return !mLocked && mMode == InteractionMode::Free; }
+    bool allowsResizeInteraction() const override
+        { return !mLocked && mMode == InteractionMode::Free; }
+    void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
+    void hoverMoveEvent(QGraphicsSceneHoverEvent* event) override;
+    void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
 
 private:
     QPointF constrainedPoint(const QPointF& scenePos) const;
@@ -55,8 +70,21 @@ private:
                            bool baseAtBottom);
     void paintProtractor(QPainter* painter, const QRectF& bounds,
                          bool baseAtBottom);
+    void paintControls(QPainter* painter, const QRectF& bounds,
+                       bool baseAtBottom);
+    void paintDynamicMeasurements(QPainter* painter, const QRectF& bounds,
+                                  bool baseAtBottom);
+    QVector<QRectF> controlRects(const QRectF& bounds, bool baseAtBottom) const;
+    qreal displayedRotation() const;
     QLineF mDrawingGuide;
     qreal mStrokeWidth;
+    bool mLocked;
+    InteractionMode mMode;
+    int mPressedControl;
+    qreal mSymmetricLengthCm;
+    bool mDrawingGuideVisible;
+    qreal mMeasuredAngle;
+    bool mMeasuredAngleVisible;
 };
 
 #endif // UBGRAPHICSARISTO_H

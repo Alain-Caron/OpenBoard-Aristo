@@ -157,6 +157,9 @@ class UBGraphicsTriangle : public UBAbstractDrawRuler, public QGraphicsPolygonIt
         // Specialized set squares can reuse all the native interaction logic
         // while providing their own symmetric geometry and graduations.
         virtual bool usesSymmetricGeometry() const { return false; }
+        virtual bool allowsMoveInteraction() const { return true; }
+        virtual bool allowsRotateInteraction() const { return true; }
+        virtual bool allowsResizeInteraction() const { return true; }
 
     private:
 

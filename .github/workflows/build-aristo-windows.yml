@@ -76,7 +76,7 @@ jobs:
       - name: Upload portable Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: OpenBoard-Aristo-V3-Windows-portable
+          name: OpenBoard-Aristo-V4-Windows-portable
           path: build/win32/release/product/**
           if-no-files-found: error
           retention-days: 14

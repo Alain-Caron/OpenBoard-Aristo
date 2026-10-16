@@ -812,19 +812,21 @@ void UBGraphicsTriangle::mousePressEvent(QGraphicsSceneMouseEvent *event)
     lastRect = rect().toRect();
     lastPos = sceneTransform().inverted().map(event->screenPos());
 
-    if (resize1Polygon().containsPoint(event->pos().toPoint(), Qt::OddEvenFill))
+    if (allowsResizeInteraction()
+        && resize1Polygon().containsPoint(event->pos().toPoint(), Qt::OddEvenFill))
     {
         mResizing1 = true;
         event->accept();
     }
     else
-    if (resize2Polygon().containsPoint(event->pos().toPoint(), Qt::OddEvenFill))
+    if (allowsResizeInteraction()
+        && resize2Polygon().containsPoint(event->pos().toPoint(), Qt::OddEvenFill))
     {
         mResizing2 = true;
         event->accept();
     }
     else
-    if(rotateRect().contains(event->pos()))
+    if(allowsRotateInteraction() && rotateRect().contains(event->pos()))
     {
         mRotating = true;
         mCursorRotationAngle = 0;
@@ -835,7 +837,10 @@ void UBGraphicsTriangle::mousePressEvent(QGraphicsSceneMouseEvent *event)
     }
     else
     {
-        QGraphicsItem::mousePressEvent(event);
+        if (allowsMoveInteraction())
+            QGraphicsItem::mousePressEvent(event);
+        else
+            event->accept();
     }
     mShowButtons = false;
     mCloseSvgItem->setVisible(false);
@@ -850,7 +855,10 @@ void UBGraphicsTriangle::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
     if (!mResizing1 && !mResizing2 && !mRotating)
     {
-        QGraphicsItem::mouseMoveEvent(event);
+        if (allowsMoveInteraction())
+            QGraphicsItem::mouseMoveEvent(event);
+        else
+            event->accept();
 
         // snap to grid
         if (scene()->isSnapping()) {
