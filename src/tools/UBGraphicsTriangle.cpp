@@ -737,9 +737,13 @@ QRectF    UBGraphicsTriangle::rotateRect() const
         const QSizeF size = mRotateSvgItem->boundingRect().size();
         const bool baseAtBottom = mOrientation == BottomLeft || mOrientation == BottomRight;
         const qreal x = bounds.center().x() - size.width() / 2.0;
+        // Keep the handle in the opaque ruler strip.  Placing it above that
+        // strip puts it in the transparent triangular cut-out: leaving the
+        // item's shape then fires hoverLeaveEvent and hides the handle before
+        // the user can click it.
         const qreal y = baseAtBottom
-            ? bounds.bottom() - d - size.height() - 12.0
-            : bounds.top() + d + 12.0;
+            ? bounds.bottom() - d / 2.0 - size.height() / 2.0
+            : bounds.top() + d / 2.0 - size.height() / 2.0;
         return QRectF(QPointF(x, y), size);
     }
 

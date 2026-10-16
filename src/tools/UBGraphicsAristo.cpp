@@ -342,7 +342,9 @@ void UBGraphicsAristo::paintProtractor(QPainter* painter, const QRectF& bounds,
     const qreal radius = qMin(bounds.width() * kProtractorRadiusRatio,
                               bounds.height() * 0.72);
     const qreal verticalSign = baseAtBottom ? -1.0 : 1.0;
-    const QFontMetricsF metrics(painter->font());
+    QFont primaryFont = painter->font();
+    QFont secondaryFont = primaryFont;
+    secondaryFont.setPointSizeF(qMax(6.0, primaryFont.pointSizeF() * 0.82));
 
     // Semicircle and radial ticks are both generated from the same exact
     // degree value. This prevents the visual/label mismatch of bitmap scales.
@@ -387,15 +389,39 @@ void UBGraphicsAristo::paintProtractor(QPainter* painter, const QRectF& bounds,
         if (degree % 10 != 0)
             continue;
 
-        const QString label = QString::number(degree);
-        const qreal labelRadius = radius - 27.0;
-        const QPointF labelCenter(origin.x() - labelRadius * cosine,
-                                  origin.y() + verticalSign * labelRadius * sine);
-        const QRectF labelRect(labelCenter.x() - metrics.horizontalAdvance(label) / 2.0,
-                               labelCenter.y() - metrics.height() / 2.0,
-                               metrics.horizontalAdvance(label), metrics.height());
-        painter->drawText(labelRect, Qt::AlignCenter, label);
+        // Double, counter-running scale, as on a physical protractor:
+        // 0..180 is read from the left and 180..0 from the right.  Both
+        // scales therefore show exactly 90 degrees on the centre line.
+        const QString primaryLabel = QString::number(degree);
+        const QString secondaryLabel = QString::number(180 - degree);
+        const qreal primaryLabelRadius = radius - 25.0;
+        const qreal secondaryLabelRadius = radius - 48.0;
+
+        painter->setFont(primaryFont);
+        QFontMetricsF primaryMetrics(primaryFont);
+        const QPointF primaryCenter(origin.x() - primaryLabelRadius * cosine,
+                                    origin.y() + verticalSign * primaryLabelRadius * sine);
+        const QRectF primaryRect(primaryCenter.x() - primaryMetrics.horizontalAdvance(primaryLabel) / 2.0,
+                                 primaryCenter.y() - primaryMetrics.height() / 2.0,
+                                 primaryMetrics.horizontalAdvance(primaryLabel), primaryMetrics.height());
+        painter->drawText(primaryRect, Qt::AlignCenter, primaryLabel);
+
+        // At 90 degrees both scales have the same value, so one centred label
+        // is clearer than two identical, vertically adjacent labels.
+        if (degree != 90)
+        {
+            painter->setFont(secondaryFont);
+            QFontMetricsF secondaryMetrics(secondaryFont);
+            const QPointF secondaryCenter(origin.x() - secondaryLabelRadius * cosine,
+                                          origin.y() + verticalSign * secondaryLabelRadius * sine);
+            const QRectF secondaryRect(secondaryCenter.x() - secondaryMetrics.horizontalAdvance(secondaryLabel) / 2.0,
+                                       secondaryCenter.y() - secondaryMetrics.height() / 2.0,
+                                       secondaryMetrics.horizontalAdvance(secondaryLabel), secondaryMetrics.height());
+            painter->drawText(secondaryRect, Qt::AlignCenter, secondaryLabel);
+        }
     }
+
+    painter->setFont(primaryFont);
 
     // Reference rays make the most frequently constructed angles immediately
     // visible without replacing the one-degree snapping available on the arc.
