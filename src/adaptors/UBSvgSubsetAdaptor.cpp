@@ -3362,9 +3362,6 @@ void UBSvgSubsetAdaptor::UBSvgSubsetWriter::triangleToSvg(UBGraphicsTriangle *it
     mXmlWriter.writeAttribute("height", QString("%1").arg(rect.height()));
     mXmlWriter.writeAttribute("transform", toSvgTransform(item->sceneTransform()));
     mXmlWriter.writeAttribute("orientation", UBGraphicsTriangle::orientationToStr(item->getOrientation()));
-    mXmlWriter.writeAttribute("locked", item->isInteractionLocked() ? "1" : "0");
-    mXmlWriter.writeAttribute("interaction-mode", QString::number(item->interactionModeValue()));
-    mXmlWriter.writeAttribute("symmetric-length-cm", QString::number(item->symmetricLengthCm()));
 
     QString zs;
     zs.setNum(item->zValue(), 'f'); // 'f' keeps precision
@@ -3416,6 +3413,13 @@ void UBSvgSubsetAdaptor::UBSvgSubsetWriter::aristoToSvg(UBGraphicsAristo* item)
     mXmlWriter.writeAttribute("height", QString::number(rect.height()));
     mXmlWriter.writeAttribute("transform", toSvgTransform(item->sceneTransform()));
     mXmlWriter.writeAttribute("orientation", UBGraphicsTriangle::orientationToStr(item->getOrientation()));
+    mXmlWriter.writeAttribute(QStringLiteral("locked"),
+                              item->isInteractionLocked() ? QStringLiteral("1")
+                                                          : QStringLiteral("0"));
+    mXmlWriter.writeAttribute(QStringLiteral("interaction-mode"),
+                              QString::number(item->interactionModeValue()));
+    mXmlWriter.writeAttribute(QStringLiteral("symmetric-length-cm"),
+                              QString::number(item->symmetricLengthCm()));
 
     QString zValue;
     zValue.setNum(item->zValue(), 'f');
@@ -3447,7 +3451,8 @@ UBGraphicsAristo* UBSvgSubsetAdaptor::UBSvgSubsetReader::aristoFromSvg()
         aristo->setOrientation(orientation);
     }
 
-    const bool locked = mXmlReader.attributes().value("locked") == "1";
+    const bool locked = mXmlReader.attributes().value("locked").toString()
+        == QStringLiteral("1");
     const int mode = mXmlReader.attributes().value("interaction-mode").toInt();
     qreal symmetricLength = mXmlReader.attributes().value("symmetric-length-cm").toDouble();
     if (symmetricLength <= 0.0)
