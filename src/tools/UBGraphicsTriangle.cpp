@@ -731,6 +731,18 @@ QRectF    UBGraphicsTriangle::vFlipRect() const
 
 QRectF    UBGraphicsTriangle::rotateRect() const
 {
+    if (usesSymmetricGeometry())
+    {
+        const QRectF bounds = bounding_Rect();
+        const QSizeF size = mRotateSvgItem->boundingRect().size();
+        const bool baseAtBottom = mOrientation == BottomLeft || mOrientation == BottomRight;
+        const qreal x = bounds.center().x() - size.width() / 2.0;
+        const qreal y = baseAtBottom
+            ? bounds.bottom() - d - size.height() - 12.0
+            : bounds.top() + d + 12.0;
+        return QRectF(QPointF(x, y), size);
+    }
+
     QPointF p(C2);
     qreal buttonsX = vFlipRect().left();
 
