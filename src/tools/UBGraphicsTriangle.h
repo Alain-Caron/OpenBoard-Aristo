@@ -151,8 +151,12 @@ class UBGraphicsTriangle : public UBAbstractDrawRuler, public QGraphicsPolygonIt
         virtual void    hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
         virtual void    hoverMoveEvent(QGraphicsSceneHoverEvent *event);
 
-        void paintGraduations(QPainter *painter);
+        virtual void paintGraduations(QPainter *painter);
         void paintHelp(QPainter *painter);
+
+        // Specialized set squares can reuse all the native interaction logic
+        // while providing their own symmetric geometry and graduations.
+        virtual bool usesSymmetricGeometry() const { return false; }
 
     private:
 

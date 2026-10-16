@@ -89,6 +89,7 @@ class UBToolsManager : public QObject
         UBToolDescriptor compass;
         UBToolDescriptor mask;
         UBToolDescriptor triangle;
+        UBToolDescriptor aristo;
         UBToolDescriptor magnifier;
         UBToolDescriptor cache;
 

@@ -3,6 +3,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBAbstractDrawRuler.h
     UBGraphicsAxes.cpp
     UBGraphicsAxes.h
+    UBGraphicsAristo.cpp
+    UBGraphicsAristo.h
     UBGraphicsCache.cpp
     UBGraphicsCache.h
     UBGraphicsCompass.cpp

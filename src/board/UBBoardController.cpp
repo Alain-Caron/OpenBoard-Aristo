@@ -1604,6 +1604,11 @@ UBItem *UBBoardController::downloadFinished(bool pSuccess, QUrl sourceUrl, QUrl 
             mActiveScene->addTriangle(pPos);
             UBDrawingController::drawingController()->setStylusTool(UBStylusTool::Selector);
         }
+        else if (sourceUrl.toString() == UBToolsManager::manager()->aristo.id)
+        {
+            mActiveScene->addAristo(pPos);
+            UBDrawingController::drawingController()->setStylusTool(UBStylusTool::Selector);
+        }
         else if (sourceUrl.toString() == UBToolsManager::manager()->cache.id)
         {
             mActiveScene->addCache();

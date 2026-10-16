@@ -209,6 +209,28 @@ std::shared_ptr<UBGraphicsScene> UBGraphicsTriangle::scene() const
 
 void UBGraphicsTriangle::calculatePoints(const QRectF& r)
 {
+    if (usesSymmetricGeometry())
+    {
+        const bool baseAtBottom = mOrientation == BottomLeft || mOrientation == BottomRight;
+        const qreal baseY = baseAtBottom ? r.bottom() : r.top();
+        const qreal apexY = baseAtBottom ? r.top() : r.bottom();
+        const qreal innerBaseY = baseAtBottom ? baseY - d : baseY + d;
+        const qreal innerApexY = baseAtBottom ? apexY + (2.0 * d) : apexY - (2.0 * d);
+
+        A1 = QPointF(r.center().x(), apexY);
+        B1 = QPointF(r.left(), baseY);
+        C1 = QPointF(r.right(), baseY);
+        A2 = QPointF(r.center().x(), innerApexY);
+        B2 = QPointF(r.left() + d, innerBaseY);
+        C2 = QPointF(r.right() - d, innerBaseY);
+
+        C = QLineF(A1, B1).length();
+        W1 = d;
+        H1 = d;
+        CC = A2;
+        mShouldPaintInnerTriangle = r.width() > 4 * d && r.height() > 3 * d;
+        return;
+    }
 
     switch(mOrientation)
     {
@@ -828,23 +850,42 @@ void UBGraphicsTriangle::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
         if (mResizing1)
         {
-            if (mOrientation == TopLeft || mOrientation == BottomLeft)
+            if (usesSymmetricGeometry())
             {
-                int deltaX = currPos.x() - lastPos.x();
+                int deltaX = (mOrientation == TopLeft || mOrientation == BottomLeft)
+                    ? currPos.x() - lastPos.x()
+                    : lastPos.x() - currPos.x();
                 if (lastRect.width() + deltaX < sMinWidth)
                     deltaX = sMinWidth - lastRect.width();
 
-                setRect(QRectF(lastRect.left(), lastRect.top(),
-                    lastRect.width() + deltaX, lastRect.height()), mOrientation);
+                const qreal width = lastRect.width() + deltaX;
+                const qreal height = width / 2.0;
+                const qreal x = (mOrientation == TopLeft || mOrientation == BottomLeft)
+                    ? lastRect.left() : lastRect.right() - width;
+                const qreal y = (mOrientation == BottomLeft || mOrientation == BottomRight)
+                    ? lastRect.bottom() - height : lastRect.top();
+                setRect(QRectF(x, y, width, height), mOrientation);
             }
             else
             {
-                int deltaX = lastPos.x() - currPos.x();
-                if (lastRect.width() + deltaX < sMinWidth)
-                    deltaX = sMinWidth - lastRect.width();
+                if (mOrientation == TopLeft || mOrientation == BottomLeft)
+                {
+                    int deltaX = currPos.x() - lastPos.x();
+                    if (lastRect.width() + deltaX < sMinWidth)
+                        deltaX = sMinWidth - lastRect.width();
 
-                setRect(QRectF(lastRect.left() - deltaX, lastRect.top(),
-                    lastRect.width() + deltaX, lastRect.height()), mOrientation);
+                    setRect(QRectF(lastRect.left(), lastRect.top(),
+                        lastRect.width() + deltaX, lastRect.height()), mOrientation);
+                }
+                else
+                {
+                    int deltaX = lastPos.x() - currPos.x();
+                    if (lastRect.width() + deltaX < sMinWidth)
+                        deltaX = sMinWidth - lastRect.width();
+
+                    setRect(QRectF(lastRect.left() - deltaX, lastRect.top(),
+                        lastRect.width() + deltaX, lastRect.height()), mOrientation);
+                }
             }
         }
 
@@ -852,23 +893,41 @@ void UBGraphicsTriangle::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 
         if (mResizing2)
         {
-            if (mOrientation == BottomRight || mOrientation == BottomLeft)
+            if (usesSymmetricGeometry())
             {
-                int deltaY = lastPos.y() - currPos.y();
+                int deltaY = (mOrientation == BottomRight || mOrientation == BottomLeft)
+                    ? lastPos.y() - currPos.y()
+                    : currPos.y() - lastPos.y();
                 if (lastRect.height() + deltaY < sMinHeight)
                     deltaY = sMinHeight - lastRect.height();
 
-                setRect(QRectF(lastRect.left(), lastRect.top() - deltaY,
-                        lastRect.width(), lastRect.height() + deltaY), mOrientation);
+                const qreal height = lastRect.height() + deltaY;
+                const qreal width = height * 2.0;
+                const qreal x = lastRect.center().x() - width / 2.0;
+                const qreal y = (mOrientation == BottomLeft || mOrientation == BottomRight)
+                    ? lastRect.bottom() - height : lastRect.top();
+                setRect(QRectF(x, y, width, height), mOrientation);
             }
             else
             {
-                int deltaY = currPos.y() - lastPos.y();
-                if (lastRect.height() + deltaY < sMinHeight)
-                    deltaY = sMinHeight - lastRect.height();
+                if (mOrientation == BottomRight || mOrientation == BottomLeft)
+                {
+                    int deltaY = lastPos.y() - currPos.y();
+                    if (lastRect.height() + deltaY < sMinHeight)
+                        deltaY = sMinHeight - lastRect.height();
 
-                setRect(QRectF(lastRect.left(), lastRect.top(),
-                        lastRect.width(), lastRect.height() + deltaY), mOrientation);
+                    setRect(QRectF(lastRect.left(), lastRect.top() - deltaY,
+                            lastRect.width(), lastRect.height() + deltaY), mOrientation);
+                }
+                else
+                {
+                    int deltaY = currPos.y() - lastPos.y();
+                    if (lastRect.height() + deltaY < sMinHeight)
+                        deltaY = sMinHeight - lastRect.height();
+
+                    setRect(QRectF(lastRect.left(), lastRect.top(),
+                            lastRect.width(), lastRect.height() + deltaY), mOrientation);
+                }
             }
 
         }
@@ -1175,4 +1234,3 @@ bool UBGraphicsTriangle::contains(const QRectF &rect, bool strict)
 void UBGraphicsTriangle::EndLine()
 {
 }
-

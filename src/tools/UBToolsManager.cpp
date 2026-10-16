@@ -99,6 +99,13 @@ UBToolsManager::UBToolsManager(QObject *parent)
     mToolsIcon.insert(triangle.id,":/images/toolPalette/triangleTool.png");
     mDescriptors << triangle;
 
+    aristo.id = "openboardtool://aristo";
+    aristo.icon = QPixmap(":/images/toolPalette/aristoTool.png");
+    aristo.label = tr("Aristo set square");
+    aristo.version = "2.0";
+    mToolsIcon.insert(aristo.id, ":/images/toolPalette/aristoTool.png");
+    mDescriptors << aristo;
+
 
     magnifier.id = "openboardtool://magnifier";
     magnifier.icon = QPixmap(":/images/toolPalette/magnifierTool.png");

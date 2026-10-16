@@ -49,6 +49,7 @@ class UBGraphicsPDFItem;
 class UBGraphicsTextItem;
 class UBGraphicsRuler;
 class UBGraphicsProtractor;
+class UBGraphicsAristo;
 class UBGraphicsCompass;
 class UBDocumentProxy;
 class UBGraphicsCurtainItem;
@@ -240,6 +241,7 @@ class UBGraphicsScene: public UBCoreGraphicsScene, public UBItem, public std::en
         void addProtractor(QPointF center);
         void addCompass(QPointF center);
         void addTriangle(QPointF center);
+        void addAristo(QPointF center);
         void addMagnifier(UBMagnifierParams params);
 
         void addMask(const QPointF &center = QPointF());

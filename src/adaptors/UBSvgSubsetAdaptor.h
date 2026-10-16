@@ -57,6 +57,7 @@ class UBDocumentProxy;
 class UBGraphicsStroke;
 class UBPersistenceManager;
 class UBGraphicsTriangle;
+class UBGraphicsAristo;
 class UBGraphicsCache;
 class UBGraphicsGroupContainerItem;
 class UBGraphicsStrokesGroup;
@@ -171,6 +172,7 @@ class UBSvgSubsetAdaptor
                 UBGraphicsProtractor* protractorFromSvg();
 
                 UBGraphicsTriangle* triangleFromSvg();
+                UBGraphicsAristo* aristoFromSvg();
 
                 UBGraphicsCache* cacheFromSvg();
 
@@ -281,6 +283,7 @@ class UBSvgSubsetAdaptor
                 void protractorToSvg(UBGraphicsProtractor *item);
                 void cacheToSvg(UBGraphicsCache* item);
                 void triangleToSvg(UBGraphicsTriangle *item);
+                void aristoToSvg(UBGraphicsAristo *item);
                 void writeSvgElement(std::shared_ptr<UBDocumentProxy> proxy);
 
         private:

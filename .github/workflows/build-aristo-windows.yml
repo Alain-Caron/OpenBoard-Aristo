@@ -1,0 +1,82 @@
+name: Build OpenBoard Aristo for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/native-aristo-instrument
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      QT_VERSION: 6.9.3
+      QT_ARCH: win64_msvc2022_64
+
+    steps:
+      - name: Checkout OpenBoard Aristo
+        uses: actions/checkout@v4
+
+      - name: Checkout OpenBoard third-party dependencies
+        uses: actions/checkout@v4
+        with:
+          repository: OpenBoard-org/OpenBoard-ThirdParty
+          path: OpenBoard-ThirdParty
+
+      - name: Place dependencies beside OpenBoard
+        shell: pwsh
+        run: Move-Item -Path OpenBoard-ThirdParty -Destination ..\OpenBoard-ThirdParty
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ env.QT_ARCH }}
+          cache: true
+          modules: qtmultimedia qtpositioning qtwebchannel qtwebengine qt5compat
+
+      - name: Configure MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build QuaZip dependency
+        shell: cmd
+        working-directory: ..\OpenBoard-ThirdParty\quazip
+        run: |
+          qmake quazip.pro CONFIG+=release
+          nmake release
+
+      - name: Build OpenBoard Aristo
+        shell: cmd
+        run: |
+          qmake OpenBoard.pro CONFIG+=release
+          nmake release
+
+      - name: Assemble portable Windows package
+        shell: pwsh
+        run: |
+          $product = Join-Path $PWD "build\win32\release\product"
+          if (-not (Test-Path (Join-Path $product "OpenBoard.exe"))) {
+            throw "OpenBoard.exe was not produced"
+          }
+          New-Item -ItemType Directory -Force -Path $product | Out-Null
+          Copy-Item -Recurse -Force resources\etc\* $product
+          Copy-Item -Recurse -Force resources\library (Join-Path $product "library")
+          Copy-Item -Recurse -Force resources\fonts (Join-Path $product "fonts")
+          Copy-Item -Recurse -Force resources\customizations (Join-Path $product "customizations")
+          Copy-Item -Recurse -Force resources\startupHints (Join-Path $product "startupHints")
+          Copy-Item -Force ..\OpenBoard-ThirdParty\poppler\bin\*.dll $product
+          Copy-Item -Force ..\OpenBoard-ThirdParty\zlib\1.2.11\bin\zlib.dll $product
+          Copy-Item -Force ..\OpenBoard-ThirdParty\openssl\openssl-3.0.15-win64\bin\libssl-3-x64.dll $product
+          Copy-Item -Force ..\OpenBoard-ThirdParty\openssl\openssl-3.0.15-win64\bin\libcrypto-3-x64.dll $product
+          windeployqt --release --compiler-runtime --force --verbose 2 (Join-Path $product "OpenBoard.exe")
+
+      - name: Upload portable Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenBoard-Aristo-V2-Windows-portable
+          path: build/win32/release/product/**
+          if-no-files-found: error
+          retention-days: 14

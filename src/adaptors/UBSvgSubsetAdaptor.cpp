@@ -57,6 +57,7 @@
 #include "tools/UBGraphicsProtractor.h"
 #include "tools/UBGraphicsCurtainItem.h"
 #include "tools/UBGraphicsTriangle.h"
+#include "tools/UBGraphicsAristo.h"
 #include "tools/UBGraphicsCache.h"
 
 #include "document/UBDocumentProxy.h"
@@ -840,6 +841,15 @@ void UBSvgSubsetAdaptor::UBSvgSubsetReader::processElement()
                 mScene->registerTool(triangle);
             }
         }
+        else if (name == "aristo")
+        {
+            UBGraphicsAristo* aristo = aristoFromSvg();
+            if (aristo)
+            {
+                mScene->addItem(aristo);
+                mScene->registerTool(aristo);
+            }
+        }
         else if (name == "cache")
         {
             UBGraphicsCache* cache = cacheFromSvg();
@@ -1488,6 +1498,15 @@ bool UBSvgSubsetAdaptor::UBSvgSubsetWriter::persistScene(std::shared_ptr<UBDocum
         if (protractor && protractor->isVisible())
         {
             protractorToSvg(protractor);
+            continue;
+        }
+
+        // Is the item an Aristo set square? Check it before the generic
+        // triangle because both share the native triangle implementation.
+        UBGraphicsAristo* aristo = qgraphicsitem_cast<UBGraphicsAristo*> (item);
+        if (aristo && aristo->isVisible())
+        {
+            aristoToSvg(aristo);
             continue;
         }
 
@@ -3382,6 +3401,51 @@ UBGraphicsTriangle* UBSvgSubsetAdaptor::UBSvgSubsetReader::triangleFromSvg()
 
     triangle->setVisible(true);
     return triangle;
+}
+
+void UBSvgSubsetAdaptor::UBSvgSubsetWriter::aristoToSvg(UBGraphicsAristo* item)
+{
+    mXmlWriter.writeStartElement(UBSettings::uniboardDocumentNamespaceUri, "aristo");
+    const QRectF rect = item->boundingRect() - QMarginsF(0.5, 0.5, 0.5, 0.5);
+    mXmlWriter.writeAttribute("x", QString::number(rect.x()));
+    mXmlWriter.writeAttribute("y", QString::number(rect.y()));
+    mXmlWriter.writeAttribute("width", QString::number(rect.width()));
+    mXmlWriter.writeAttribute("height", QString::number(rect.height()));
+    mXmlWriter.writeAttribute("transform", toSvgTransform(item->sceneTransform()));
+    mXmlWriter.writeAttribute("orientation", UBGraphicsTriangle::orientationToStr(item->getOrientation()));
+
+    QString zValue;
+    zValue.setNum(item->zValue(), 'f');
+    mXmlWriter.writeAttribute(UBSettings::uniboardDocumentNamespaceUri, "z-value", zValue);
+    mXmlWriter.writeAttribute(UBSettings::uniboardDocumentNamespaceUri, "uuid",
+                              UBStringUtils::toCanonicalUuid(item->uuid()));
+    mXmlWriter.writeEndElement();
+}
+
+UBGraphicsAristo* UBSvgSubsetAdaptor::UBSvgSubsetReader::aristoFromSvg()
+{
+    UBGraphicsAristo* aristo = new UBGraphicsAristo();
+    aristo->setData(UBGraphicsItemData::ItemLayerType, QVariant(UBItemLayerType::Tool));
+    graphicsItemFromSvg(aristo);
+
+    const auto x = mXmlReader.attributes().value("x");
+    const auto y = mXmlReader.attributes().value("y");
+    const auto width = mXmlReader.attributes().value("width");
+    const auto height = mXmlReader.attributes().value("height");
+    const auto orientation = UBGraphicsTriangle::orientationFromStr(
+        mXmlReader.attributes().value("orientation").toString());
+
+    if (!x.isNull() && !y.isNull() && !width.isNull() && !height.isNull())
+    {
+        aristo->setRect(x.toFloat(), y.toFloat(), width.toFloat(), height.toFloat(), orientation);
+    }
+    else
+    {
+        aristo->setOrientation(orientation);
+    }
+
+    aristo->setVisible(true);
+    return aristo;
 }
 
 UBGraphicsCache* UBSvgSubsetAdaptor::UBSvgSubsetReader::cacheFromSvg()
